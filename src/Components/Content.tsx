@@ -2,16 +2,16 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import About from './About';
-import Studies from './Studies';
-import Projects from './Projects';
-import Experiences from './Experiences';
+import ProjectList from './Projects/ProjectList';
 import '../Styles/ContentStyle.css';
+import Experiences from './Experience/Experiences';
+import Education from './Education/Education';
 
 const Content: React.FC = () => {
 	return (
 		<Box
 			sx={{
-        mt: 10,
+				mt: 10,
 				minHeight: '80%',
 				overflowY: 'auto',
 				color: 'white',
@@ -19,8 +19,8 @@ const Content: React.FC = () => {
 		>
 			<About />
 			<Experiences />
-			<Studies />
-			<Projects />
+			<Education />
+			<ProjectList />
 		</Box>
 	);
 };

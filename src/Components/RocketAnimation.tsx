@@ -1,179 +1,222 @@
-import React, { useRef, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useRef, useEffect, useState } from 'react';
+import { Box } from '@mui/material';
 import Lottie from 'lottie-react';
 import gsap from 'gsap';
-import Stats from 'stats-gl';
-import { MotionPathPlugin } from 'gsap/MotionPathPlugin'; // Import MotionPathPlugin
-import rocketAnimation from '../lottiefiles/rocket.json'; // Replace with your rocket Lottie file
-import moonAnimation from '../lottiefiles/moon.json'; // Replace with your moon Lottie file
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
+import rocketAnimation from '../lottiefiles/rocket.json';
+import moonAnimation from '../lottiefiles/moon.json';
+import starsAnimation from '../lottiefiles/stars.json';
+import launchPadImage from '../Assets/launchpad.png';
 
 interface RocketAnimationProps {
-	onComplete: () => void; // Callback when animation is done
+	onComplete?: () => void; // Optional onComplete callback
 }
 
 const RocketAnimation: React.FC<RocketAnimationProps> = ({ onComplete }) => {
+	const [animationComplete, setAnimationComplete] = useState(false); // Track animation completion
 	const rocketRef = useRef<HTMLDivElement>(null);
 	const moonRef = useRef<HTMLDivElement>(null);
-	const commentRef = useRef<HTMLDivElement>(null);
 	const starsRef = useRef<HTMLDivElement>(null);
-	const stats = useRef(new Stats());
+	const launchPadRef = useRef<HTMLDivElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+	const animationTimeline = useRef<gsap.core.Timeline | null>(null); // Store GSAP timeline in a ref
 
+	// Capture the initial coordinates of the rocket and the moon
+	const [initialRocketPosition, setInitialRocketPosition] = useState({
+		x: 0,
+		y: 0,
+	});
+	const [initialMoonPosition, setInitialMoonPosition] = useState({
+		x: 0,
+		y: 0,
+	});
+
+	// Ensure initial positions are captured correctly when the component mounts
 	useEffect(() => {
-		// Register MotionPathPlugin for GSAP
 		gsap.registerPlugin(MotionPathPlugin);
 
-		// Attach StatsGL to the DOM for performance monitoring
-		document.body.appendChild(stats.current.dom);
+		if (rocketRef.current && moonRef.current) {
+			// Capture initial positions
+			const rocketRect = rocketRef.current.getBoundingClientRect();
+			const moonRect = moonRef.current.getBoundingClientRect();
 
-		// GSAP Animation Timeline for rocket movement and rotation
-		const tl = gsap.timeline({
-			onComplete: () => onComplete(), // Callback when animation completes
-		});
+			// Log initial positions for debugging
+			console.log('Initial Rocket Position:', rocketRect);
+			console.log('Initial Moon Position:', moonRect);
 
-		// First Stage: Blast off for 2 seconds
-		tl.to(rocketRef.current, {
-			duration: 1.8, // Faster upward movement to avoid long delay
-			y: -250, // Move straight up to y = -250
-			ease: 'power4.inOut', // Smooth easing for gradual acceleration and deceleration
-		})
-			// Second Stage: Add stars and shake the rocket slightly for turbulence (2.5s)
-			.add(() => {
-				// Make stars gradually appear and move down smoothly
-				gsap.to(starsRef.current, {
-					opacity: 1,
-					duration: 0.5, // Quicker fade-in for stars
-					ease: 'power2.inOut',
-				});
-				gsap.to(starsRef.current, {
-					y: 1000,
-					duration: 3, // Keep stars moving continuously throughout
-					ease: 'linear', // Smooth, continuous star movement
-					repeat: -1,
-				});
+			// Set initial positions in state
+			setInitialRocketPosition({ x: rocketRect.left, y: rocketRect.top });
+			setInitialMoonPosition({ x: moonRect.left, y: moonRect.top });
+		}
+	}, []);
 
-				// Subtle rocket shaking for turbulence
-				gsap.to(rocketRef.current, {
-					x: '+=3', // Smaller shake amount for subtle effect
-					y: '+=3',
-					yoyo: true,
-					repeat: 10, // Slightly reduce shaking repetitions
-					duration: 0.08, // Faster shake for realism
-					ease: 'sine.inOut',
-				});
-			}, '+=0.2') // Added slight delay before shaking begins
-			// Third Stage: Apply curviness to head to the moon (3s), with manual rotation only after shaking
-			.to(
-				rocketRef.current,
-				{
-					duration: 3.5, // Slightly faster curved motion to keep momentum
-					ease: 'power4.inOut', // Smoother easing for entering the curve
-					motionPath: {
-						path: [
-							{ x: 0, y: -250 }, // Match the ending point of the straight-up motion
-							{ x: -50, y: -280 }, // Start a gentle curve
-							{ x: -150, y: -400 }, // Gradual turn upward
-							{ x: -250, y: -450 }, // Smooth curve towards the moon
-							{ x: -450, y: -600 }, // More gradual curve upward
-							{ x: -600, y: -700 }, // Approaching the moon smoothly
-							{ x: -800, y: -800 }, // Final point near the moon
-						],
-						curviness: 1.2, // Adjust the curviness for fluid motion
-					},
-					onUpdate: () => {
-						const progress = tl.progress(); // Get animation progress (0 to 1)
+	useEffect(() => {
+		if (
+			initialRocketPosition &&
+			initialMoonPosition &&
+			!animationTimeline.current
+		) {
+			// Initialize animation timeline
+			animationTimeline.current = gsap.timeline({
+				ease: 'power4.inOut',
+				onComplete: () => {
+					setAnimationComplete(true);
 
-						// Only apply rotation after the shaking (during the curving)
-						if (progress > 0.2) {
-							const rotate = progress * -55; // Smooth rotation along the curve
-							gsap.set(rocketRef.current, { rotate });
-						}
-					},
+					// Log final positions for debugging
+					const finalRocketPosition =
+						rocketRef.current?.getBoundingClientRect();
+					const finalMoonPosition = moonRef.current?.getBoundingClientRect();
+					console.log('Final Rocket Position:', finalRocketPosition);
+					console.log('Final Moon Position:', finalMoonPosition);
+
+					// Call onComplete if provided
+					if (onComplete) onComplete();
 				},
-				'-=0.1' // Start the second animation 0.1 seconds before the first ends
-			)
-			// Show "We're arriving!" comment bubble above the rocket
-			.add(() => {
-				gsap.to(commentRef.current, {
-					opacity: 1,
-					y: -80,
-					duration: 1.5, // Speed up the bubble appearance to match the curve
-					ease: 'power1.inOut',
-				});
-			}, '-=3.5') // Bubble appears earlier to sync with rocket approaching moon
-			// Fourth Stage: Scale down the rocket once the "We're arriving!" text is done
-			.add(() => {
-				gsap.to(rocketRef.current, {
-					scale: 0.5, // Shrink rocket to 50% of its original size
-					transformOrigin: 'center center', // Ensure it scales from the center
-					duration: 2, // Duration of the scaling effect
-					ease: 'power2.inOut',
-				});
-			}, '+=0.5'); // Start scaling down shortly after "We're arriving!" bubble
+			});
 
-		// Moon fade-in effect after rocket reaches its position
-		gsap.to(moonRef.current, {
-			opacity: 1,
-			delay: 1.5, // Shorter delay so moon appears in sync
-			duration: 1,
-			ease: 'power2.inOut',
-		});
+			// Set initial position of rocket and other elements
+			gsap.set(rocketRef.current, {
+				bottom: '20px',
+				left: '50%',
+				transform: 'translateX(-50%)',
+			});
+			gsap.set(launchPadRef.current, { opacity: 1, y: 0 });
+			gsap.set(moonRef.current, { scale: 0.5 });
+			gsap.set(starsRef.current, { y: 0 });
 
-		// Clean up StatsGL from DOM on unmount
-		return () => {
-			document.body.removeChild(stats.current.dom);
-		};
-	}, [onComplete]);
+			// Create animations with initial motion path
+			animationTimeline.current
+				.to(launchPadRef.current, { y: 100, duration: 10, ease: 'linear' }, '0')
+				.to(starsRef.current, { y: 1000, duration: 10, ease: 'linear' }, '0')
+				.to(
+					rocketRef.current,
+					{
+						y: -500, // Move rocket upwards
+						duration: 10,
+						ease: 'linear',
+						onUpdate: () => {
+							const rect = rocketRef.current?.getBoundingClientRect();
+							console.log('Rocket position during upward animation:', rect);
+						},
+					},
+					'0'
+				)
+				.to(
+					moonRef.current,
+					{
+						scale: 1.5, // Scale the moon
+						duration: 5,
+						ease: 'power4.inOut',
+						onUpdate: () => {
+							const rect = moonRef.current?.getBoundingClientRect();
+							console.log('Moon position during scaling:', rect);
+						},
+					},
+					'-=5'
+				)
+				// Before starting the motion path animation, recalculate the positions dynamically
+				.add(() => {
+					// Recalculate the positions of the rocket and moon dynamically
+					const rocketRect = rocketRef.current?.getBoundingClientRect();
+					const moonRect = moonRef.current?.getBoundingClientRect();
+
+					if (rocketRect && moonRect) {
+						const deltaX = moonRect.left - rocketRect.left;
+						const deltaY = moonRect.top - rocketRect.top;
+
+						console.log('Dynamic DeltaX:', deltaX, 'Dynamic DeltaY:', deltaY);
+
+						// Variables to control proximity to the moon
+						const proximityOffsetX = 50; // Adjust this value to control horizontal distance (negative to land left of the moon, positive to land right)
+						const proximityOffsetY = -380; // Adjust this value to control vertical distance (negative to land above the moon, positive to land below)
+
+						// Define the motion path with proximity offsets applied
+						const motionPath = [
+							{ x: 0, y: 0 }, // Start at current position
+							{ x: deltaX * 0.25, y: deltaY * 0.25 }, // Curve point 1
+							{ x: deltaX * 0.35, y: deltaY * 0.5  }, // Curve point 2, add upward arc
+							{ x: deltaX * 0.45, y: deltaY * 0.75 }, // Curve point 3
+							{ x: deltaX + proximityOffsetX, y: deltaY + proximityOffsetY }, // Final position near the moon with proximity adjustments
+						];
+
+						console.log(
+							'Updated Motion Path with Proximity Offsets:',
+							motionPath
+						);
+
+						console.log('Updated Motion Path:', motionPath);
+
+						// Animate the rocket with the recalculated motion path
+						const durationMultiplier = 0.5; // 0.5 to reduce to half, 2 to double the time, etc.
+
+						animationTimeline.current!.to(
+							rocketRef.current,
+							{
+								duration: 10 * durationMultiplier, // Apply the multiplier to the duration
+								scale: 0.6,
+								motionPath: {
+									path: motionPath,
+									curviness: 1.5,
+								},
+								rotate: -55,
+								transformOrigin: 'center center',
+								onUpdate: () => {
+									const rect = rocketRef.current?.getBoundingClientRect();
+									console.log(
+										'Rocket position during motion path animation:',
+										rect
+									);
+								},
+							},
+							'-=5'
+						);
+					}
+				}, '-=5');
+		}
+	}, [initialRocketPosition, initialMoonPosition, onComplete]);
 
 	return (
 		<Box
+			ref={containerRef}
 			sx={{
+				position: 'fixed',
+				top: 0,
+				left: 0,
+				width: '100%',
 				height: '100vh',
-				display: 'flex',
-				justifyContent: 'center',
-				alignItems: 'center',
-				backgroundColor: '#121212',
-				position: 'relative',
+				zIndex: 50,
 				overflow: 'hidden',
+				pointerEvents: 'none',
 			}}
 		>
 			{/* Rocket */}
 			<Box
+				className={'Rocket'}
 				ref={rocketRef}
 				sx={{
 					position: 'absolute',
-					bottom: '20px', // Start from bottom
-					left: '50%', // Centered horizontally
-					transform: 'translateX(-50%)', // Center horizontally
 					width: '150px',
 					height: '150px',
+					transition: 'top 1s ease, left 1s ease',
 				}}
 			>
 				<Lottie animationData={rocketAnimation} loop={false} />
 			</Box>
 
-			{/* Comment Bubble */}
+			{/* Launch Pad */}
 			<Box
-				ref={commentRef}
+				ref={launchPadRef}
 				sx={{
 					position: 'absolute',
-					bottom: '180px', // Adjusted based on rocket position
+					bottom: '0px',
 					left: '50%',
 					transform: 'translateX(-50%)',
-					opacity: 0, // Initially hidden
+					width: '200px',
+					height: '50px',
+					opacity: 1,
 				}}
 			>
-				<Typography
-					variant='body1'
-					sx={{
-						backgroundColor: '#ffffff',
-						color: '#000',
-						padding: '10px',
-						borderRadius: '10px',
-						boxShadow: '0px 0px 8px rgba(0, 0, 0, 0.3)',
-					}}
-				>
-					We're arriving!
-				</Typography>
+				<img src={launchPadImage} alt='Launch Pad' width='100%' />
 			</Box>
 
 			{/* Moon */}
@@ -181,11 +224,12 @@ const RocketAnimation: React.FC<RocketAnimationProps> = ({ onComplete }) => {
 				ref={moonRef}
 				sx={{
 					position: 'absolute',
-					top: '10px', // Moon at the top-left corner
-					left: '10px',
+					top: '15%', // Place the moon at the top-left corner explicitly
+					left: '15%', // Ensure the moon starts in the top-left area
 					width: '150px',
 					height: '150px',
-					opacity: 0, // Hidden initially, fades in
+					transform: 'translate(-50%, -50%)',
+					transition: 'top 1s ease, left 1s ease',
 				}}
 			>
 				<Lottie animationData={moonAnimation} loop={true} />
@@ -200,12 +244,13 @@ const RocketAnimation: React.FC<RocketAnimationProps> = ({ onComplete }) => {
 					left: '0',
 					width: '100%',
 					height: '100vh',
-					backgroundImage: 'url(/path/to/star-background.png)', // Your star asset
 					backgroundRepeat: 'repeat',
 					backgroundSize: 'cover',
-					opacity: 0, // Initially hidden
+					opacity: 1,
 				}}
-			/>
+			>
+				<Lottie animationData={starsAnimation} loop={true} />
+			</Box>
 		</Box>
 	);
 };
